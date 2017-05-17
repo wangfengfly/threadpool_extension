@@ -27,12 +27,40 @@
 #include "ext/standard/info.h"
 #include "php_pthread_pool.h"
 
+#include "threadpool.c"
+
 /* If you declare any globals in php_pthread_pool.h uncomment this:
 ZEND_DECLARE_MODULE_GLOBALS(pthread_pool)
 */
 
 /* True global resources - no need for thread safety here */
 static int le_pthread_pool;
+
+PHP_FUNCTION(threadpool_create){
+	long tc, qs;
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ll", &tc, &qs) == FAILURE){
+		return;
+	}
+	threadpool_t *pool = threadpool_create(tc, qs, 0);
+	if(pool == NULL){
+		return;
+	}
+
+	zval* res = NULL;
+	MAKE_STD_ZVAL(res);
+	if(object_init(res) != SUCCESS){
+		return;
+	}
+	add_property_long(res, "thread_count", pool->thread_count);
+	add_property_long(res, "queue_size", pool->queue_size);
+	add_property_long(res, "head", pool->head);
+	add_property_long(res, "tail", pool->tail);
+	add_property_long(res, "count", pool->count);
+	add_property_long(res, "shutdown", pool->shutdown);
+	add_property_long(res, "started", pool->started);
+	add_property_zval(res, "queue", (zval*)pool->queue);
+	RETURN_ZVAL(res, 1, 0);
+}
 
 /* {{{ PHP_INI
  */
@@ -143,6 +171,7 @@ PHP_MINFO_FUNCTION(pthread_pool)
  */
 const zend_function_entry pthread_pool_functions[] = {
 	PHP_FE(confirm_pthread_pool_compiled,	NULL)		/* For testing, remove later. */
+	PHP_FE(threadpool_create, NULL)
 	PHP_FE_END	/* Must be the last line in pthread_pool_functions[] */
 };
 /* }}} */
