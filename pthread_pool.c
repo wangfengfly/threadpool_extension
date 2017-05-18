@@ -36,6 +36,18 @@ ZEND_DECLARE_MODULE_GLOBALS(pthread_pool)
 /* True global resources - no need for thread safety here */
 static int le_pthread_pool;
 
+/*
+ * ×Ô¼ºÌí¼Ó
+ */
+#define MY_RES_NAME "pthread_resource"
+
+static void resdtor(zend_rsrc_list_entry *rsrc TSRMLS_DC){
+    threadpool_t *res = (threadpool_t*)rsrc->ptr;
+    if (res) {
+    	threadpool_destroy(res, 0);
+    }
+}
+
 PHP_FUNCTION(threadpool_create){
 	long tc, qs;
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ll", &tc, &qs) == FAILURE){
@@ -46,12 +58,12 @@ PHP_FUNCTION(threadpool_create){
 		return;
 	}
 
-	zval* res = NULL;
+	/*zval* res = NULL;
 	MAKE_STD_ZVAL(res);
 	if(object_init(res) != SUCCESS){
 		return;
-	}
-	add_property_long(res, "thread_count", pool->thread_count);
+	}*/
+	/*add_property_long(res, "thread_count", pool->thread_count);
 	add_property_long(res, "queue_size", pool->queue_size);
 	add_property_long(res, "head", pool->head);
 	add_property_long(res, "tail", pool->tail);
@@ -59,7 +71,34 @@ PHP_FUNCTION(threadpool_create){
 	add_property_long(res, "shutdown", pool->shutdown);
 	add_property_long(res, "started", pool->started);
 	add_property_zval(res, "queue", (zval*)pool->queue);
-	RETURN_ZVAL(res, 1, 0);
+	RETURN_ZVAL(res, 1, 0);*/
+	ZEND_REGISTER_RESOURCE(return_value, pool, le_pthread_pool);
+}
+
+PHP_FUNCTION(threadpool_add){
+	threadpool_t* pool = NULL;
+	zval* zpool = NULL;
+	zend_fcall_info  fci;
+	zend_fcall_info_cache fci_cache;
+	zval *retval_ptr = NULL;
+	php_printf("before zend_parse_parameters\n");
+	if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rf*", &zpool, &fci, &fci_cache, &fci.params, &fci.param_count) == FAILURE) {
+	        RETURN_FALSE;
+	}
+	ZEND_FETCH_RESOURCE(pool, threadpool_t*, &zpool, -1, MY_RES_NAME, le_pthread_pool);
+	php_printf("thread_count=%d\n", pool->thread_count);
+	fci.retval_ptr_ptr = &retval_ptr;
+	int res = threadpool_add(pool, &fci, &fci_cache, 0);
+	php_printf("after threadpool_add, res=%d\n", res);
+	php_printf("function pointer=%p\n", &fci);
+	php_printf("fci_cache.calling_scope pointer ===%p\n", fci_cache.calling_scope);
+	php_printf("type=====%d\n", Z_TYPE_P(fci.function_name));
+	php_printf("fci object_ptr====%p\n", fci.object_ptr);
+
+	char * function_name = estrndup(Z_STRVAL_P(fci.function_name), Z_STRLEN_P(fci.function_name));
+	php_printf("function name====%s\n", function_name);
+
+	RETURN_TRUE;
 }
 
 /* {{{ PHP_INI
@@ -118,7 +157,8 @@ PHP_MINIT_FUNCTION(pthread_pool)
 	/* If you have INI entries, uncomment these lines 
 	REGISTER_INI_ENTRIES();
 	*/
-	return SUCCESS;
+	le_pthread_pool = zend_register_list_destructors_ex(resdtor, NULL, MY_RES_NAME, module_number);
+    return SUCCESS;
 }
 /* }}} */
 
@@ -172,6 +212,7 @@ PHP_MINFO_FUNCTION(pthread_pool)
 const zend_function_entry pthread_pool_functions[] = {
 	PHP_FE(confirm_pthread_pool_compiled,	NULL)		/* For testing, remove later. */
 	PHP_FE(threadpool_create, NULL)
+	PHP_FE(threadpool_add, NULL)
 	PHP_FE_END	/* Must be the last line in pthread_pool_functions[] */
 };
 /* }}} */

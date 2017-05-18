@@ -79,8 +79,7 @@ threadpool_t *threadpool_create(int thread_count, int queue_size, int flags);
  * @return 0 if all goes well, negative values in case of error (@see
  * threadpool_error_t for codes).
  */
-int threadpool_add(threadpool_t *pool, void (*routine)(void *),
-                   void *arg, int flags);
+int threadpool_add(threadpool_t *pool, zend_fcall_info* fci, zend_fcall_info_cache* fci_cache, int flags);
 
 /**
  * @function threadpool_destroy
