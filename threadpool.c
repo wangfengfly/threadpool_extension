@@ -51,8 +51,8 @@ typedef enum {
  */
 
 typedef struct {
-	zend_fcall_info* function;
-	zend_fcall_info_cache* argument;
+	zend_fcall_info function;
+	zend_fcall_info_cache argument;
 } threadpool_task_t;
 
 /**
@@ -146,13 +146,13 @@ threadpool_t *threadpool_create(int thread_count, int queue_size, int flags)
     return NULL;
 }
 
-int threadpool_add(threadpool_t *pool, zend_fcall_info* fci, zend_fcall_info_cache* fci_cache, int flags)
+int threadpool_add(threadpool_t *pool, zend_fcall_info fci, zend_fcall_info_cache fci_cache, int flags)
 {
     int err = 0;
     int next;
     (void) flags;
 
-    if(pool == NULL || fci == NULL) {
+    if(pool == NULL) {
         return threadpool_invalid;
     }
 
@@ -175,7 +175,6 @@ int threadpool_add(threadpool_t *pool, zend_fcall_info* fci, zend_fcall_info_cac
             break;
         }
 
-        fprintf(stderr, "before add to quque...%d\n", 1);
         /* Add task to queue */
         pool->queue[pool->tail].function = fci;
         pool->queue[pool->tail].argument = fci_cache;
@@ -293,21 +292,14 @@ static void *threadpool_thread(void *threadpool)
         /* Unlock */
         pthread_mutex_unlock(&(pool->lock));
 
-        fprintf(stderr, "function pointer=%p\n", task.function);
-        fprintf(stderr, "function argument=%p\n", task.argument);
-        fprintf(stderr, "function name len=%d\n", Z_STRLEN_P(((zend_fcall_info*)(task.function))->function_name));
-        fprintf(stderr, "function name pointer = %s\n", Z_STRVAL_P(((zend_fcall_info*)(task.function))->function_name));
-        char * function_name = estrndup(Z_STRVAL_P(((zend_fcall_info*)(task.function))->function_name), Z_STRLEN_P(((zend_fcall_info*)(task.function))->function_name));
-        fprintf(stderr, "in threadpool_thread, function name====%s\n", function_name);
-
         /* Get to work */
-        if(zend_call_function(task.function, NULL TSRMLS_CC) == SUCCESS && (*(task.function)).retval_ptr_ptr && (*(task.function)).retval_ptr_ptr) {
+        if(zend_call_function(&(task.function), NULL TSRMLS_CC) == SUCCESS && (task.function).retval_ptr_ptr && (task.function).retval_ptr_ptr) {
 			/*return_value = (*(task.function)).retval_ptr_ptr;
 			zval_copy_ctor(return_value);*/
-			zval_ptr_dtor((*(task.function)).retval_ptr_ptr);
+			zval_ptr_dtor((task.function).retval_ptr_ptr);
         }
-		if((*(task.function)).params) {
-			efree((*(task.function)).params);
+		if((task.function).params) {
+			efree((task.function).params);
 		}
     }
 
