@@ -51,8 +51,8 @@ typedef enum {
  */
 
 typedef struct {
-	zend_fcall_info function;
-	zend_fcall_info_cache argument;
+	zend_fcall_info* function;
+	zend_fcall_info_cache* argument;
 } threadpool_task_t;
 
 /**
@@ -130,6 +130,7 @@ threadpool_t *threadpool_create(int thread_count, int queue_size, int flags)
     for(i = 0; i < thread_count; i++) {
         if(pthread_create(&(pool->threads[i]), NULL,
                           threadpool_thread, (void*)pool) != 0) {
+        	fprintf(stderr, "pthread_create fail...\n");
             threadpool_destroy(pool, 0);
             return NULL;
         }
@@ -146,7 +147,7 @@ threadpool_t *threadpool_create(int thread_count, int queue_size, int flags)
     return NULL;
 }
 
-int threadpool_add(threadpool_t *pool, zend_fcall_info fci, zend_fcall_info_cache fci_cache, int flags)
+int threadpool_add(threadpool_t *pool, zend_fcall_info* fci, zend_fcall_info_cache* fci_cache, int flags)
 {
     int err = 0;
     int next;
@@ -183,6 +184,7 @@ int threadpool_add(threadpool_t *pool, zend_fcall_info fci, zend_fcall_info_cach
 
         /* pthread_cond_broadcast */
         if(pthread_cond_signal(&(pool->notify)) != 0) {
+        	fprintf(stderr, "pthread_cond_signal fail...\n");
             err = threadpool_lock_failure;
             break;
         }
@@ -200,10 +202,12 @@ int threadpool_destroy(threadpool_t *pool, int flags)
     int i, err = 0;
 
     if(pool == NULL) {
+    	fprintf(stderr, "threadpool_invalid\n");
         return threadpool_invalid;
     }
 
     if(pthread_mutex_lock(&(pool->lock)) != 0) {
+    	fprintf(stderr, "pthread_mutex_lock fail.\n");
         return threadpool_lock_failure;
     }
 
@@ -220,13 +224,16 @@ int threadpool_destroy(threadpool_t *pool, int flags)
         /* Wake up all worker threads */
         if((pthread_cond_broadcast(&(pool->notify)) != 0) ||
            (pthread_mutex_unlock(&(pool->lock)) != 0)) {
+        	fprintf(stderr, "threadpool_lock_failure.\n");
             err = threadpool_lock_failure;
             break;
         }
 
         /* Join all worker thread */
         for(i = 0; i < pool->thread_count; i++) {
+
             if(pthread_join(pool->threads[i], NULL) != 0) {
+            	fprintf(stderr, "join thread %d fail\n", i);
                 err = threadpool_thread_failure;
             }
         }
@@ -234,7 +241,7 @@ int threadpool_destroy(threadpool_t *pool, int flags)
 
     /* Only if everything went well do we deallocate the pool */
     if(!err) {
-        threadpool_free(pool);
+        return threadpool_free(pool);
     }
     return err;
 }
@@ -264,6 +271,7 @@ int threadpool_free(threadpool_t *pool)
 
 static void *threadpool_thread(void *threadpool)
 {
+
     threadpool_t *pool = (threadpool_t *)threadpool;
     threadpool_task_t task;
 
@@ -280,6 +288,7 @@ static void *threadpool_thread(void *threadpool)
         if((pool->shutdown == immediate_shutdown) ||
            ((pool->shutdown == graceful_shutdown) &&
             (pool->count == 0))) {
+
             break;
         }
 
@@ -293,18 +302,18 @@ static void *threadpool_thread(void *threadpool)
         pthread_mutex_unlock(&(pool->lock));
 
         /* Get to work */
-        if(zend_call_function(&(task.function), NULL TSRMLS_CC) == SUCCESS && (task.function).retval_ptr_ptr && (task.function).retval_ptr_ptr) {
+        if(zend_call_function(task.function, NULL TSRMLS_CC) == SUCCESS) {
 			/*return_value = (*(task.function)).retval_ptr_ptr;
 			zval_copy_ctor(return_value);*/
-			zval_ptr_dtor((task.function).retval_ptr_ptr);
+
+			//zval_ptr_dtor((task.function)->retval_ptr_ptr);
         }
-		if((task.function).params) {
-			efree((task.function).params);
+		if((task.function)->params) {
+			efree((task.function)->params);
 		}
     }
 
     pool->started--;
-
     pthread_mutex_unlock(&(pool->lock));
     pthread_exit(NULL);
     return(NULL);

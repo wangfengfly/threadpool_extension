@@ -35,45 +35,38 @@ ZEND_DECLARE_MODULE_GLOBALS(pthread_pool)
 
 /* True global resources - no need for thread safety here */
 static int le_pthread_pool;
-
-/*
- * ×Ô¼ºÌí¼Ó
- */
-#define MY_RES_NAME "pthread_resource"
-
-
-static void resdtor(zend_rsrc_list_entry *rsrc TSRMLS_DC){
-    threadpool_t *res = (threadpool_t*)rsrc->ptr;
-    if (res) {
-    	threadpool_destroy(res, 0);
-    }
-}
+threadpool_t* pool = NULL;
+int total;
 
 PHP_FUNCTION(threadpool_create){
 	long tc, qs;
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ll", &tc, &qs) == FAILURE){
-		return;
+		RETURN_FALSE;
 	}
-	threadpool_t *pool = threadpool_create(tc, qs, 0);
+	pool = threadpool_create(tc, qs, 0);
 	if(pool == NULL){
-		return;
+		RETURN_FALSE;
 	}
-	ZEND_REGISTER_RESOURCE(return_value, pool, le_pthread_pool);
+	total = qs;
+	RETURN_TRUE;
 }
 
 PHP_FUNCTION(threadpool_add){
-	threadpool_t* pool = NULL;
-	zval* zpool = NULL;
 	zend_fcall_info  fci;
 	zend_fcall_info_cache fci_cache;
 	zval *retval_ptr = NULL;
-	if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rf*", &zpool, &fci, &fci_cache, &fci.params, &fci.param_count) == FAILURE) {
+	if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "f*", &fci, &fci_cache, &fci.params, &fci.param_count) == FAILURE) {
 	        RETURN_FALSE;
 	}
-	ZEND_FETCH_RESOURCE(pool, threadpool_t*, &zpool, -1, MY_RES_NAME, le_pthread_pool);
 	fci.retval_ptr_ptr = &retval_ptr;
-	int res = threadpool_add(pool, fci, fci_cache, 0);
-	sleep(2);
+
+	int res;
+	res = threadpool_add(pool, &fci, &fci_cache, 0);
+	if(res!=0){
+		RETURN_FALSE;
+	}
+
+	res = threadpool_destroy(pool, 1);
 	RETURN_TRUE;
 }
 
@@ -133,7 +126,6 @@ PHP_MINIT_FUNCTION(pthread_pool)
 	/* If you have INI entries, uncomment these lines 
 	REGISTER_INI_ENTRIES();
 	*/
-	le_pthread_pool = zend_register_list_destructors_ex(resdtor, NULL, MY_RES_NAME, module_number);
     return SUCCESS;
 }
 /* }}} */
