@@ -55,17 +55,19 @@ PHP_FUNCTION(threadpool_add){
 	zend_fcall_info  fci;
 	zend_fcall_info_cache fci_cache;
 	zval *retval_ptr = NULL;
-	if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "f*", &fci, &fci_cache, &fci.params, &fci.param_count) == FAILURE) {
+	long s;
+	if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "lf*", &s, &fci, &fci_cache, &fci.params, &fci.param_count) == FAILURE) {
 	        RETURN_FALSE;
 	}
 	fci.retval_ptr_ptr = &retval_ptr;
 
-	int res;
-	res = threadpool_add(pool, &fci, &fci_cache, 0);
-	if(res!=0){
-		RETURN_FALSE;
+	int res, j;
+	for(j=0; j<s; j++){
+		res = threadpool_add(pool, &fci, &fci_cache, 0);
+		if(res!=0){
+			RETURN_FALSE;
+		}
 	}
-
 	res = threadpool_destroy(pool, 1);
 	RETURN_TRUE;
 }

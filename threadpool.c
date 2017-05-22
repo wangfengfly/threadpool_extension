@@ -298,19 +298,17 @@ static void *threadpool_thread(void *threadpool)
         pool->head = (pool->head + 1) % pool->queue_size;
         pool->count -= 1;
 
-        /* Unlock */
-        pthread_mutex_unlock(&(pool->lock));
-
         /* Get to work */
         if(zend_call_function(task.function, NULL TSRMLS_CC) == SUCCESS) {
 			/*return_value = (*(task.function)).retval_ptr_ptr;
 			zval_copy_ctor(return_value);*/
-
-			//zval_ptr_dtor((task.function)->retval_ptr_ptr);
+			zval_ptr_dtor((task.function)->retval_ptr_ptr);
         }
 		if((task.function)->params) {
 			efree((task.function)->params);
 		}
+		/* Unlock */
+		pthread_mutex_unlock(&(pool->lock));
     }
 
     pool->started--;
