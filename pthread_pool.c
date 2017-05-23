@@ -60,7 +60,9 @@ PHP_FUNCTION(threadpool_add){
 	        RETURN_FALSE;
 	}
 	fci.retval_ptr_ptr = &retval_ptr;
-
+	if(s > total){
+		RETURN_FALSE;
+	}
 	int res, j;
 	for(j=0; j<s; j++){
 		res = threadpool_add(pool, &fci, &fci_cache, 0);
