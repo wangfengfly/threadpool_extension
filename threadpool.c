@@ -304,9 +304,7 @@ static void *threadpool_thread(void *threadpool)
 			zval_copy_ctor(return_value);*/
 			zval_ptr_dtor((task.function)->retval_ptr_ptr);
         }
-		if((task.function)->params) {
-			efree((task.function)->params);
-		}
+
 		/* Unlock */
 		pthread_mutex_unlock(&(pool->lock));
     }

@@ -68,7 +68,11 @@ PHP_FUNCTION(threadpool_add){
 			RETURN_FALSE;
 		}
 	}
+
 	res = threadpool_destroy(pool, 1);
+	if(fci.params) {
+		efree(fci.params);
+	}
 	RETURN_TRUE;
 }
 
