@@ -298,7 +298,10 @@ static void *threadpool_thread(void *threadpool)
         pool->head = (pool->head + 1) % pool->queue_size;
         pool->count -= 1;
 
-        /* Get to work */
+        /* Get to work
+         * zend_call_funtion内部会用到CG(function_table)
+         * function_table属于编译全局变量，所以多线程环境下改变这个变量，需要加锁，否则会段错误
+         * */
         if(zend_call_function(task.function, NULL TSRMLS_CC) == SUCCESS) {
 			/*return_value = (*(task.function)).retval_ptr_ptr;
 			zval_copy_ctor(return_value);*/
